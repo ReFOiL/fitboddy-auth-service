@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "auth-service"
+version = "0.1.0"
+description = "Fitboddy auth-service"
+authors = ["Fitboddy Team"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.136.1"
+uvicorn = { extras = ["standard"], version = "^0.46.0" }
+sqlalchemy = "^2.0.44"
+psycopg = { extras = ["binary"], version = "^3.2.11" }
+pyjwt = "^2.10.1"
+argon2-cffi = "^25.1.0"
+email-validator = "^2.3.0"
+alembic = "^1.16.5"
+pydantic-settings = "^2.11.0"
+httpx = "^0.28.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.2"
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"
