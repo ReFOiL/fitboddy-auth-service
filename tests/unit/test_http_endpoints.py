@@ -22,6 +22,7 @@ def test_register_and_me() -> None:
     register_response = client.post(
         "/api/v1/auth/register",
         json={
+            "login": "user1_login",
             "email": "user1@example.com",
             "password": "MyStrongPass123",
             "role": "trainer",
@@ -37,6 +38,7 @@ def test_register_and_me() -> None:
     )
     assert me_response.status_code == 200
     assert me_response.json()["tenant_id"] == "marketplace"
+    assert me_response.json()["login"] == "user1_login"
     assert me_response.json()["email"] == "user1@example.com"
 
 
@@ -44,6 +46,7 @@ def test_refresh_and_logout_flow() -> None:
     register_response = client.post(
         "/api/v1/auth/register",
         json={
+            "login": "user2_login",
             "email": "user2@example.com",
             "password": "MyStrongPass123",
             "role": "client",
@@ -66,6 +69,7 @@ def test_login_with_wrong_password_returns_401() -> None:
     register_response = client.post(
         "/api/v1/auth/register",
         json={
+            "login": "user3_login",
             "email": "user3@example.com",
             "password": "MyStrongPass123",
             "role": "client",
@@ -85,6 +89,7 @@ def test_login_with_wrong_password_returns_401() -> None:
 
 def test_register_duplicate_email_returns_409() -> None:
     payload = {
+        "login": "dup_login",
         "email": "dup@example.com",
         "password": "MyStrongPass123",
         "role": "client",
@@ -93,6 +98,26 @@ def test_register_duplicate_email_returns_409() -> None:
     assert first_response.status_code == 201
 
     second_response = client.post("/api/v1/auth/register", json=payload)
+    assert second_response.status_code == 409
+
+
+def test_register_duplicate_login_returns_409() -> None:
+    first_payload = {
+        "login": "same_login",
+        "email": "same-login-1@example.com",
+        "password": "MyStrongPass123",
+        "role": "client",
+    }
+    second_payload = {
+        "login": "same_login",
+        "email": "same-login-2@example.com",
+        "password": "MyStrongPass123",
+        "role": "trainer",
+    }
+    first_response = client.post("/api/v1/auth/register", json=first_payload)
+    assert first_response.status_code == 201
+
+    second_response = client.post("/api/v1/auth/register", json=second_payload)
     assert second_response.status_code == 409
 
 
@@ -110,6 +135,7 @@ def test_check_with_valid_access_token_returns_user() -> None:
     register_response = client.post(
         "/api/v1/auth/register",
         json={
+            "login": "check_login",
             "email": "check@example.com",
             "password": "MyStrongPass123",
             "role": "client",
@@ -121,9 +147,45 @@ def test_check_with_valid_access_token_returns_user() -> None:
     check_response = client.post("/api/v1/auth/check", json={"access_token": access_token})
     assert check_response.status_code == 200
     assert check_response.json()["tenant_id"] == "marketplace"
+    assert check_response.json()["login"] == "check_login"
     assert check_response.json()["email"] == "check@example.com"
 
 
 def test_check_with_invalid_access_token_returns_401() -> None:
     check_response = client.post("/api/v1/auth/check", json={"access_token": "bad-token"})
     assert check_response.status_code == 401
+
+
+def test_internal_summaries_returns_logins_by_user_ids() -> None:
+    first_user = client.post(
+        "/api/v1/auth/register",
+        json={
+            "login": "summary_login_1",
+            "email": "summary-1@example.com",
+            "password": "MyStrongPass123",
+            "role": "client",
+        },
+    )
+    second_user = client.post(
+        "/api/v1/auth/register",
+        json={
+            "login": "summary_login_2",
+            "email": "summary-2@example.com",
+            "password": "MyStrongPass123",
+            "role": "trainer",
+        },
+    )
+    assert first_user.status_code == 201
+    assert second_user.status_code == 201
+
+    first_user_id = first_user.json()["user"]["user_id"]
+    second_user_id = second_user.json()["user"]["user_id"]
+    response = client.post(
+        "/api/v1/auth/internal/summaries",
+        json={"user_ids": [first_user_id, second_user_id, "missing-user"]},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    items = payload["items"]
+    assert any(item["user_id"] == first_user_id and item["login"] == "summary_login_1" for item in items)
+    assert any(item["user_id"] == second_user_id and item["login"] == "summary_login_2" for item in items)

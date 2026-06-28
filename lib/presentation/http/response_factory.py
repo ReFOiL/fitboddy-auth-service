@@ -1,6 +1,6 @@
-from domain.entities import User
+from domain.entities import User, UserSummary
 from application.use_cases import AuthResult
-from presentation.http.schemas import AuthResponse, TokenPairResponse, UserResponse
+from presentation.http.schemas import AuthResponse, InternalUserSummariesResponse, TokenPairResponse, UserResponse, UserSummaryResponse
 
 
 class AuthResponseFactory:
@@ -18,8 +18,16 @@ class AuthResponseFactory:
         return UserResponse(
             user_id=user.user_id,
             tenant_id=user.tenant_id,
+            login=user.login,
             email=user.email,
             role=user.role,
             is_active=user.is_active,
             created_at=user.created_at,
         )
+
+    def from_user_summaries(self, summaries: list[UserSummary]) -> InternalUserSummariesResponse:
+        return InternalUserSummariesResponse(items=[self.from_user_summary(item) for item in summaries])
+
+    @staticmethod
+    def from_user_summary(summary: UserSummary) -> UserSummaryResponse:
+        return UserSummaryResponse(user_id=summary.user_id, login=summary.login)

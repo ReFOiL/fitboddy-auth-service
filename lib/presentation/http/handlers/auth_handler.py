@@ -9,6 +9,8 @@ from presentation.http.schemas import (
     AuthResponse,
     CheckRequest,
     HealthResponse,
+    InternalUserSummariesRequest,
+    InternalUserSummariesResponse,
     LoginRequest,
     LogoutRequest,
     RefreshRequest,
@@ -95,6 +97,15 @@ class AuthHttpHandler:
             with self._runtime.auth_service_scope() as auth_service:
                 user = auth_service.get_current_user(self._request_factory.to_check_command(payload.access_token))
                 return self._response_factory.from_domain_user(user)
+        except AuthError as exc:
+            self._error_translator.raise_http_error(exc)
+        raise AssertionError("unreachable")
+
+    def internal_summaries(self, payload: InternalUserSummariesRequest) -> InternalUserSummariesResponse:
+        try:
+            with self._runtime.auth_service_scope() as auth_service:
+                summaries = auth_service.list_user_summaries(self._request_factory.to_internal_summaries_command(payload))
+                return self._response_factory.from_user_summaries(summaries)
         except AuthError as exc:
             self._error_translator.raise_http_error(exc)
         raise AssertionError("unreachable")

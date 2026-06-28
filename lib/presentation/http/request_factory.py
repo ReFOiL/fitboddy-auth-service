@@ -1,17 +1,19 @@
 from application.commands import (
     GetCurrentUserCommand,
+    ListUserSummariesCommand,
     LoginUserCommand,
     LogoutSessionCommand,
     RefreshSessionCommand,
     RegisterUserCommand,
 )
-from presentation.http.schemas import LoginRequest, LogoutRequest, RefreshRequest, RegisterRequest
+from presentation.http.schemas import InternalUserSummariesRequest, LoginRequest, LogoutRequest, RefreshRequest, RegisterRequest
 
 
 class AuthRequestFactory:
     def to_register_command(self, payload: RegisterRequest) -> RegisterUserCommand:
         return RegisterUserCommand(
             role=payload.role,
+            login=payload.login,
             email=str(payload.email),
             password=payload.password,
         )
@@ -33,3 +35,6 @@ class AuthRequestFactory:
 
     def to_check_command(self, access_token: str) -> GetCurrentUserCommand:
         return GetCurrentUserCommand(access_token=access_token)
+
+    def to_internal_summaries_command(self, payload: InternalUserSummariesRequest) -> ListUserSummariesCommand:
+        return ListUserSummariesCommand(user_ids=payload.user_ids)

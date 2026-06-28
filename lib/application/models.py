@@ -13,6 +13,7 @@ class UserModel(Base):
 
     user_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(String(64), index=True)
+    login: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(32), default="client")

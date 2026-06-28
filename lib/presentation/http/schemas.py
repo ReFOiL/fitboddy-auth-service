@@ -9,6 +9,7 @@ class HealthResponse(BaseModel):
 
 class RegisterRequest(BaseModel):
     role: str = Field(default="client", min_length=3, max_length=32)
+    login: str = Field(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9_.-]+$")
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
 
@@ -30,6 +31,10 @@ class CheckRequest(BaseModel):
     access_token: str
 
 
+class InternalUserSummariesRequest(BaseModel):
+    user_ids: list[str] = Field(default_factory=list)
+
+
 class TokenPairResponse(BaseModel):
     access_token: str
     refresh_token: str
@@ -39,6 +44,7 @@ class TokenPairResponse(BaseModel):
 class UserResponse(BaseModel):
     user_id: str
     tenant_id: str
+    login: str
     email: EmailStr
     role: str
     is_active: bool
@@ -48,3 +54,12 @@ class UserResponse(BaseModel):
 class AuthResponse(BaseModel):
     user: UserResponse
     tokens: TokenPairResponse
+
+
+class UserSummaryResponse(BaseModel):
+    user_id: str
+    login: str
+
+
+class InternalUserSummariesResponse(BaseModel):
+    items: list[UserSummaryResponse] = Field(default_factory=list)

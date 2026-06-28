@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
 from application.commands import (
     GetCurrentUserCommand,
+    ListUserSummariesCommand,
     LoginUserCommand,
     LogoutSessionCommand,
     RefreshSessionCommand,
@@ -17,7 +19,7 @@ from application.gateways import MarketplaceGateway
 from application.models import RefreshTokenModel, UserModel
 from application.repositories import RefreshTokenRepository, UserRepository
 from application.security import JwtService, PasswordService, TokenError
-from domain.entities import User
+from domain.entities import User, UserSummary
 
 
 @dataclass(frozen=True)
@@ -38,15 +40,20 @@ class UserMapper:
         return User(
             user_id=user.user_id,
             tenant_id=user.tenant_id,
+            login=user.login,
             email=user.email,
             role=user.role,
             is_active=user.is_active,
             created_at=user.created_at,
         )
 
+    def to_summary(self, user: UserModel) -> UserSummary:
+        return UserSummary(user_id=user.user_id, login=user.login)
+
 
 class AuthService:
     _DEFAULT_TENANT_ID = "marketplace"
+    _LOGIN_PATTERN = re.compile(r"^[a-z0-9_.-]{3,32}$")
     _ROLE_MAP = {
         "owner": "trainer",
         "coach": "trainer",
@@ -77,6 +84,10 @@ class AuthService:
         self._mapper = UserMapper()
 
     def register_user(self, command: RegisterUserCommand) -> AuthResult:
+        login_lookup = self._normalize_login(command.login)
+        if self._users.find_by_login(login_lookup) is not None:
+            raise ConflictError("User with this login already exists.")
+
         email_lookup = command.email.strip().lower()
         if self._users.find_by_email(email_lookup) is not None:
             raise ConflictError("User with this email already exists.")
@@ -86,6 +97,7 @@ class AuthService:
         user = UserModel(
             user_id=str(uuid4()),
             tenant_id=self._DEFAULT_TENANT_ID,
+            login=login_lookup,
             email=email_lookup,
             password_hash=self._password_service.hash(command.password),
             role=role,
@@ -170,6 +182,13 @@ class AuthService:
             raise UnauthorizedError("User not found for this token.")
         return self._mapper.to_domain(user)
 
+    def list_user_summaries(self, command: ListUserSummariesCommand) -> list[UserSummary]:
+        unique_user_ids = list(dict.fromkeys(user_id.strip() for user_id in command.user_ids if user_id.strip()))
+        if not unique_user_ids:
+            return []
+        users = self._users.list_by_ids(unique_user_ids)
+        return [self._mapper.to_summary(user) for user in users]
+
     def _decode_refresh_token(self, refresh_token: str) -> dict:
         try:
             payload = self._jwt_service.verify_token(refresh_token)
@@ -204,3 +223,9 @@ class AuthService:
         if normalized_role is None:
             raise ValidationError("Unsupported role. Use 'trainer' or 'client'.")
         return normalized_role
+
+    def _normalize_login(self, login: str) -> str:
+        normalized_login = login.strip().lower()
+        if not self._LOGIN_PATTERN.fullmatch(normalized_login):
+            raise ValidationError("Unsupported login format. Use 3-32 chars: a-z, 0-9, _, -, .")
+        return normalized_login

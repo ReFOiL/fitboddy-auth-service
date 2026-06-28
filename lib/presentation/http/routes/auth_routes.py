@@ -3,6 +3,8 @@ from fastapi import APIRouter, Header, Request, status
 from presentation.http.schemas import (
     AuthResponse,
     CheckRequest,
+    InternalUserSummariesRequest,
+    InternalUserSummariesResponse,
     LoginRequest,
     LogoutRequest,
     RefreshRequest,
@@ -27,6 +29,12 @@ class AuthRoutes:
         self.router.add_api_route("/logout", self.logout, methods=["POST"], status_code=status.HTTP_204_NO_CONTENT)
         self.router.add_api_route("/me", self.me, methods=["GET"], response_model=UserResponse)
         self.router.add_api_route("/check", self.check, methods=["POST"], response_model=UserResponse)
+        self.router.add_api_route(
+            "/internal/summaries",
+            self.internal_summaries,
+            methods=["POST"],
+            response_model=InternalUserSummariesResponse,
+        )
 
     def register(self, payload: RegisterRequest, request: Request) -> AuthResponse:
         return request.app.state.auth_handler.register(payload)
@@ -49,3 +57,6 @@ class AuthRoutes:
 
     def check(self, payload: CheckRequest, request: Request) -> UserResponse:
         return request.app.state.auth_handler.check(payload)
+
+    def internal_summaries(self, payload: InternalUserSummariesRequest, request: Request) -> InternalUserSummariesResponse:
+        return request.app.state.auth_handler.internal_summaries(payload)

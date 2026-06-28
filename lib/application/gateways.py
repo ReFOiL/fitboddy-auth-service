@@ -13,8 +13,9 @@ class MarketplaceGateway:
     def upsert_discovery_profile(self, user_id: str, role: str) -> None:
         payload = {
             "role": role,
-            "is_visible": True,
-            "looking_for_trainer": role == "client",
+            # New users should opt in explicitly from the marketplace UI.
+            "is_visible": False,
+            "looking_for_trainer": False,
         }
         try:
             response = self._http_client.put(

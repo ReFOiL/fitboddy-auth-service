@@ -20,8 +20,17 @@ class UserRepository:
     def find_by_email(self, email: str) -> UserModel | None:
         return self._session.execute(select(UserModel).where(UserModel.email == email)).scalar_one_or_none()
 
+    def find_by_login(self, login: str) -> UserModel | None:
+        return self._session.execute(select(UserModel).where(UserModel.login == login)).scalar_one_or_none()
+
     def find_by_id(self, user_id: str) -> UserModel | None:
         return self._session.get(UserModel, user_id)
+
+    def list_by_ids(self, user_ids: list[str]) -> list[UserModel]:
+        if not user_ids:
+            return []
+        statement = select(UserModel).where(UserModel.user_id.in_(user_ids))
+        return list(self._session.execute(statement).scalars().all())
 
     def add(self, user: UserModel) -> None:
         self._session.add(user)

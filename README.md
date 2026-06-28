@@ -20,6 +20,7 @@ Auth service for Fitboddy Platform MVP.
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/auth/me`
 - `POST /api/v1/auth/check`
+- `POST /api/v1/auth/internal/summaries` (internal: `user_ids` -> `login`)
 
 ## Environment
 

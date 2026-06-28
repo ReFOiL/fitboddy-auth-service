@@ -4,6 +4,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class RegisterUserCommand:
     role: str
+    login: str
     email: str
     password: str
 
@@ -27,3 +28,8 @@ class LogoutSessionCommand:
 @dataclass(frozen=True)
 class GetCurrentUserCommand:
     access_token: str
+
+
+@dataclass(frozen=True)
+class ListUserSummariesCommand:
+    user_ids: list[str]
