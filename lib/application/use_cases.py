@@ -118,7 +118,10 @@ class AuthService:
         return AuthResult(user=self._mapper.to_domain(user), tokens=token_pair)
 
     def login_user(self, command: LoginUserCommand) -> AuthResult:
-        user = self._users.find_by_email(command.email.strip().lower())
+        normalized_credential = command.email_or_login.strip().lower()
+        user = self._users.find_by_email(normalized_credential)
+        if user is None:
+            user = self._users.find_by_login(normalized_credential)
         if user is None or user.password_hash is None:
             raise UnauthorizedError("Invalid credentials.")
         if not self._password_service.verify(command.password, user.password_hash):

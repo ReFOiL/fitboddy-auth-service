@@ -84,11 +84,58 @@ def test_login_with_wrong_password_returns_401(client: TestClient) -> None:
     login_response = client.post(
         "/api/v1/auth/login",
         json={
-            "email": "user3@example.com",
+            "email_or_login": "user3@example.com",
             "password": "WrongPass123",
         },
     )
     assert login_response.status_code == 401
+
+
+def test_login_with_login_returns_200(client: TestClient) -> None:
+    register_response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "login": "user4_login",
+            "email": "user4@example.com",
+            "password": "MyStrongPass123",
+            "role": "client",
+        },
+    )
+    assert register_response.status_code == 201
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email_or_login": "USER4_LOGIN",
+            "password": "MyStrongPass123",
+        },
+    )
+    assert login_response.status_code == 200
+    payload = login_response.json()
+    assert payload["user"]["login"] == "user4_login"
+    assert payload["user"]["email"] == "user4@example.com"
+
+
+def test_login_with_legacy_email_field_returns_422(client: TestClient) -> None:
+    register_response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "login": "user5_login",
+            "email": "user5@example.com",
+            "password": "MyStrongPass123",
+            "role": "trainer",
+        },
+    )
+    assert register_response.status_code == 201
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "USER5@EXAMPLE.COM",
+            "password": "MyStrongPass123",
+        },
+    )
+    assert login_response.status_code == 422
 
 
 def test_register_duplicate_email_returns_409(client: TestClient) -> None:

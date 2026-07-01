@@ -11,7 +11,7 @@ class RegisterUserCommand:
 
 @dataclass(frozen=True)
 class LoginUserCommand:
-    email: str
+    email_or_login: str
     password: str
 
 

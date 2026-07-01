@@ -20,7 +20,7 @@ class AuthRequestFactory:
 
     def to_login_command(self, payload: LoginRequest) -> LoginUserCommand:
         return LoginUserCommand(
-            email=str(payload.email),
+            email_or_login=payload.email_or_login,
             password=payload.password,
         )
 
