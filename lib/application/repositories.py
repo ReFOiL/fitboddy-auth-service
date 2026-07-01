@@ -54,4 +54,7 @@ class RefreshTokenRepository:
 
     @staticmethod
     def is_expired(refresh_token: RefreshTokenModel) -> bool:
-        return refresh_token.expires_at <= datetime.now(UTC)
+        expires_at = refresh_token.expires_at
+        if expires_at.tzinfo is None:
+            return expires_at <= datetime.now(UTC).replace(tzinfo=None)
+        return expires_at <= datetime.now(UTC)

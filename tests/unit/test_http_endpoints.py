@@ -1,24 +1,28 @@
 from fastapi.testclient import TestClient
+import pytest
 
 from presentation.http.main import app  # type: ignore[import-not-found]
 
 
-client = TestClient(app)
+@pytest.fixture()
+def client() -> TestClient:
+    with TestClient(app) as test_client:
+        yield test_client
 
 
-def test_health() -> None:
+def test_health(client: TestClient) -> None:
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
-def test_ready() -> None:
+def test_ready(client: TestClient) -> None:
     response = client.get("/ready")
     assert response.status_code == 200
     assert response.json() == {"status": "ready"}
 
 
-def test_register_and_me() -> None:
+def test_register_and_me(client: TestClient) -> None:
     register_response = client.post(
         "/api/v1/auth/register",
         json={
@@ -42,7 +46,7 @@ def test_register_and_me() -> None:
     assert me_response.json()["email"] == "user1@example.com"
 
 
-def test_refresh_and_logout_flow() -> None:
+def test_refresh_and_logout_flow(client: TestClient) -> None:
     register_response = client.post(
         "/api/v1/auth/register",
         json={
@@ -65,7 +69,7 @@ def test_refresh_and_logout_flow() -> None:
     assert second_refresh.status_code == 401
 
 
-def test_login_with_wrong_password_returns_401() -> None:
+def test_login_with_wrong_password_returns_401(client: TestClient) -> None:
     register_response = client.post(
         "/api/v1/auth/register",
         json={
@@ -87,7 +91,7 @@ def test_login_with_wrong_password_returns_401() -> None:
     assert login_response.status_code == 401
 
 
-def test_register_duplicate_email_returns_409() -> None:
+def test_register_duplicate_email_returns_409(client: TestClient) -> None:
     payload = {
         "login": "dup_login",
         "email": "dup@example.com",
@@ -101,7 +105,7 @@ def test_register_duplicate_email_returns_409() -> None:
     assert second_response.status_code == 409
 
 
-def test_register_duplicate_login_returns_409() -> None:
+def test_register_duplicate_login_returns_409(client: TestClient) -> None:
     first_payload = {
         "login": "same_login",
         "email": "same-login-1@example.com",
@@ -121,17 +125,17 @@ def test_register_duplicate_login_returns_409() -> None:
     assert second_response.status_code == 409
 
 
-def test_me_without_bearer_token_returns_401() -> None:
+def test_me_without_bearer_token_returns_401(client: TestClient) -> None:
     response = client.get("/api/v1/auth/me")
     assert response.status_code == 401
 
 
-def test_refresh_with_invalid_token_returns_401() -> None:
+def test_refresh_with_invalid_token_returns_401(client: TestClient) -> None:
     response = client.post("/api/v1/auth/refresh", json={"refresh_token": "not-a-valid-token"})
     assert response.status_code == 401
 
 
-def test_check_with_valid_access_token_returns_user() -> None:
+def test_check_with_valid_access_token_returns_user(client: TestClient) -> None:
     register_response = client.post(
         "/api/v1/auth/register",
         json={
@@ -151,12 +155,12 @@ def test_check_with_valid_access_token_returns_user() -> None:
     assert check_response.json()["email"] == "check@example.com"
 
 
-def test_check_with_invalid_access_token_returns_401() -> None:
+def test_check_with_invalid_access_token_returns_401(client: TestClient) -> None:
     check_response = client.post("/api/v1/auth/check", json={"access_token": "bad-token"})
     assert check_response.status_code == 401
 
 
-def test_internal_summaries_returns_logins_by_user_ids() -> None:
+def test_internal_summaries_returns_logins_by_user_ids(client: TestClient) -> None:
     first_user = client.post(
         "/api/v1/auth/register",
         json={
