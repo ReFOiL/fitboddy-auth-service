@@ -14,3 +14,6 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = Field(default=5.0, alias="HTTP_TIMEOUT_SECONDS", gt=0)
     marketplace_profile_sync_enabled: bool = Field(default=True, alias="MARKETPLACE_PROFILE_SYNC_ENABLED")
     alembic_ini_path: str = Field(default="alembic.ini", alias="ALEMBIC_INI_PATH")
+    platform_admin_login: str | None = Field(default=None, alias="PLATFORM_ADMIN_LOGIN")
+    platform_admin_password: str | None = Field(default=None, alias="PLATFORM_ADMIN_PASSWORD")
+    platform_admin_email: str | None = Field(default=None, alias="PLATFORM_ADMIN_EMAIL")

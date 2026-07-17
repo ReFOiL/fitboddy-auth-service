@@ -240,3 +240,84 @@ def test_internal_summaries_returns_logins_by_user_ids(client: TestClient) -> No
     items = payload["items"]
     assert any(item["user_id"] == first_user_id and item["login"] == "summary_login_1" for item in items)
     assert any(item["user_id"] == second_user_id and item["login"] == "summary_login_2" for item in items)
+
+
+def test_admin_users_requires_platform_admin(client: TestClient) -> None:
+    register_response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "login": "regular_user",
+            "email": "regular@example.com",
+            "password": "MyStrongPass123",
+            "role": "client",
+        },
+    )
+    assert register_response.status_code == 201
+    access_token = register_response.json()["tokens"]["access_token"]
+
+    response = client.get(
+        "/api/v1/admin/users",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_admin_users_list_and_patch(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PLATFORM_ADMIN_LOGIN", "platform_admin")
+    monkeypatch.setenv("PLATFORM_ADMIN_PASSWORD", "AdminPass123")
+    monkeypatch.setenv("PLATFORM_ADMIN_EMAIL", "admin@example.com")
+
+    from application.commands import BootstrapPlatformAdminCommand
+    from application.config import Settings
+    from application.runtime import AuthApplicationRuntime
+
+    runtime = AuthApplicationRuntime(Settings())
+    with runtime.auth_service_scope() as auth_service:
+        created = auth_service.bootstrap_platform_admin(
+            BootstrapPlatformAdminCommand(
+                login="platform_admin",
+                email="admin@example.com",
+                password="AdminPass123",
+            )
+        )
+        assert created is not None
+    runtime.shutdown()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={"email_or_login": "platform_admin", "password": "AdminPass123"},
+    )
+    assert login_response.status_code == 200
+    admin_token = login_response.json()["tokens"]["access_token"]
+    assert login_response.json()["user"]["role"] == "platform_admin"
+
+    target = client.post(
+        "/api/v1/auth/register",
+        json={
+            "login": "target_user",
+            "email": "target@example.com",
+            "password": "MyStrongPass123",
+            "role": "trainer",
+        },
+    )
+    assert target.status_code == 201
+    target_id = target.json()["user"]["user_id"]
+
+    list_response = client.get(
+        "/api/v1/admin/users",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        params={"q": "target_user"},
+    )
+    assert list_response.status_code == 200
+    payload = list_response.json()
+    assert payload["total"] >= 1
+    assert any(item["user_id"] == target_id for item in payload["items"])
+
+    patch_response = client.patch(
+        f"/api/v1/admin/users/{target_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"is_active": False, "role": "client"},
+    )
+    assert patch_response.status_code == 200
+    assert patch_response.json()["is_active"] is False
+    assert patch_response.json()["role"] == "client"

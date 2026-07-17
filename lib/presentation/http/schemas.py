@@ -63,3 +63,15 @@ class UserSummaryResponse(BaseModel):
 
 class InternalUserSummariesResponse(BaseModel):
     items: list[UserSummaryResponse] = Field(default_factory=list)
+
+
+class PatchUserRequest(BaseModel):
+    is_active: bool | None = None
+    role: str | None = Field(default=None, min_length=3, max_length=32)
+
+
+class UserListResponse(BaseModel):
+    items: list[UserResponse] = Field(default_factory=list)
+    total: int
+    page: int
+    page_size: int

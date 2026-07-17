@@ -10,6 +10,14 @@ class UnauthorizedError(AuthError):
     pass
 
 
+class ForbiddenError(AuthError):
+    pass
+
+
+class NotFoundError(AuthError):
+    pass
+
+
 class ValidationError(AuthError):
     pass
 

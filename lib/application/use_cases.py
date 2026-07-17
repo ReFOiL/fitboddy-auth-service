@@ -7,14 +7,25 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from application.commands import (
+    BootstrapPlatformAdminCommand,
     GetCurrentUserCommand,
+    GetUserCommand,
     ListUserSummariesCommand,
+    ListUsersCommand,
     LoginUserCommand,
     LogoutSessionCommand,
+    PatchUserCommand,
     RefreshSessionCommand,
     RegisterUserCommand,
 )
-from application.errors import ConflictError, IntegrationError, UnauthorizedError, ValidationError
+from application.errors import (
+    ConflictError,
+    ForbiddenError,
+    IntegrationError,
+    NotFoundError,
+    UnauthorizedError,
+    ValidationError,
+)
 from application.gateways import MarketplaceGateway
 from application.models import RefreshTokenModel, UserModel
 from application.repositories import RefreshTokenRepository, UserRepository
@@ -53,6 +64,7 @@ class UserMapper:
 
 class AuthService:
     _DEFAULT_TENANT_ID = "marketplace"
+    _PLATFORM_ADMIN_ROLE = "platform_admin"
     _LOGIN_PATTERN = re.compile(r"^[a-z0-9_.-]{3,32}$")
     _ROLE_MAP = {
         "owner": "trainer",
@@ -60,6 +72,7 @@ class AuthService:
         "trainer": "trainer",
         "client": "client",
     }
+    _ASSIGNABLE_ROLES = frozenset({"trainer", "client", "platform_admin"})
 
     def __init__(
         self,
@@ -191,6 +204,82 @@ class AuthService:
             return []
         users = self._users.list_by_ids(unique_user_ids)
         return [self._mapper.to_summary(user) for user in users]
+
+    def require_platform_admin(self, access_token: str) -> User:
+        user = self.get_current_user(GetCurrentUserCommand(access_token=access_token))
+        if user.role != self._PLATFORM_ADMIN_ROLE:
+            raise ForbiddenError("platform_admin role required")
+        return user
+
+    def bootstrap_platform_admin(self, command: BootstrapPlatformAdminCommand) -> User | None:
+        login_lookup = self._normalize_login(command.login)
+        existing = self._users.find_by_login(login_lookup)
+        if existing is not None:
+            return None
+
+        email_lookup = command.email.strip().lower()
+        if self._users.find_by_email(email_lookup) is not None:
+            raise ConflictError("User with this email already exists.")
+
+        user = UserModel(
+            user_id=str(uuid4()),
+            tenant_id=self._DEFAULT_TENANT_ID,
+            login=login_lookup,
+            email=email_lookup,
+            password_hash=self._password_service.hash(command.password),
+            role=self._PLATFORM_ADMIN_ROLE,
+            is_active=True,
+        )
+        self._users.add(user)
+        self._session.commit()
+        self._users.refresh(user)
+        return self._mapper.to_domain(user)
+
+    def list_users(self, command: ListUsersCommand) -> tuple[list[User], int]:
+        page = max(command.page, 1)
+        page_size = min(max(command.page_size, 1), 100)
+        offset = (page - 1) * page_size
+        role = command.role.strip().lower() if command.role else None
+        if role and role not in self._ASSIGNABLE_ROLES:
+            raise ValidationError("Unsupported role filter.")
+        rows, total = self._users.search(
+            query=command.query,
+            role=role,
+            is_active=command.is_active,
+            offset=offset,
+            limit=page_size,
+        )
+        return [self._mapper.to_domain(row) for row in rows], total
+
+    def get_user(self, command: GetUserCommand) -> User:
+        user = self._users.find_by_id(command.user_id)
+        if user is None:
+            raise NotFoundError("User not found.")
+        return self._mapper.to_domain(user)
+
+    def patch_user(self, command: PatchUserCommand) -> User:
+        user = self._users.find_by_id(command.user_id)
+        if user is None:
+            raise NotFoundError("User not found.")
+
+        if command.is_active is not None:
+            user.is_active = command.is_active
+
+        if command.role is not None:
+            role_key = command.role.strip().lower()
+            if role_key not in self._ASSIGNABLE_ROLES:
+                raise ValidationError("Unsupported role. Use 'trainer', 'client', or 'platform_admin'.")
+            user.role = role_key
+            if self._marketplace_profile_sync_enabled and role_key in {"trainer", "client"}:
+                try:
+                    self._marketplace_gateway.upsert_discovery_profile(user.user_id, role_key)
+                except IntegrationError:
+                    self._session.rollback()
+                    raise
+
+        self._session.commit()
+        self._users.refresh(user)
+        return self._mapper.to_domain(user)
 
     def _decode_refresh_token(self, refresh_token: str) -> dict:
         try:
