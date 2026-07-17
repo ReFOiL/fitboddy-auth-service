@@ -273,7 +273,7 @@ def test_admin_users_list_and_patch(client: TestClient, monkeypatch: pytest.Monk
 
     runtime = AuthApplicationRuntime(Settings())
     with runtime.auth_service_scope() as auth_service:
-        created = auth_service.bootstrap_platform_admin(
+        created, action = auth_service.bootstrap_platform_admin(
             BootstrapPlatformAdminCommand(
                 login="platform_admin",
                 email="admin@example.com",
@@ -281,6 +281,7 @@ def test_admin_users_list_and_patch(client: TestClient, monkeypatch: pytest.Monk
             )
         )
         assert created is not None
+        assert action == "created"
     runtime.shutdown()
 
     login_response = client.post(

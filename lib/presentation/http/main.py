@@ -25,16 +25,21 @@ def _bootstrap_platform_admin(runtime: AuthApplicationRuntime, settings: Setting
     password = settings.platform_admin_password or ""
     email = (settings.platform_admin_email or "").strip()
     if not login or not password or not email:
+        print("PLATFORM_ADMIN_* incomplete; skip platform_admin bootstrap", flush=True)
         return
     try:
         with runtime.auth_service_scope() as auth_service:
-            created = auth_service.bootstrap_platform_admin(
+            user, action = auth_service.bootstrap_platform_admin(
                 BootstrapPlatformAdminCommand(login=login, email=email, password=password)
             )
-            if created is not None:
-                logger.info("Bootstrapped platform_admin user login=%s", created.login)
+            print(f"platform_admin bootstrap {action}: login={user.login}", flush=True)
+            logger.info("platform_admin bootstrap %s: login=%s", action, user.login)
     except AuthError:
         logger.exception("Failed to bootstrap platform_admin user")
+        print("PLATFORM_ADMIN bootstrap failed; see logs", flush=True)
+    except Exception:
+        logger.exception("Unexpected error during platform_admin bootstrap")
+        print("PLATFORM_ADMIN bootstrap failed unexpectedly; see logs", flush=True)
 
 
 @asynccontextmanager

@@ -211,15 +211,29 @@ class AuthService:
             raise ForbiddenError("platform_admin role required")
         return user
 
-    def bootstrap_platform_admin(self, command: BootstrapPlatformAdminCommand) -> User | None:
-        login_lookup = self._normalize_login(command.login)
-        existing = self._users.find_by_login(login_lookup)
-        if existing is not None:
-            return None
+    def bootstrap_platform_admin(self, command: BootstrapPlatformAdminCommand) -> tuple[User, str]:
+        """Create or repair platform_admin from env credentials.
 
+        Returns (user, action) where action is "created" or "updated".
+        """
+        login_lookup = self._normalize_login(command.login)
         email_lookup = command.email.strip().lower()
-        if self._users.find_by_email(email_lookup) is not None:
-            raise ConflictError("User with this email already exists.")
+        existing = self._users.find_by_login(login_lookup)
+        if existing is None:
+            existing = self._users.find_by_email(email_lookup)
+
+        if existing is not None:
+            email_owner = self._users.find_by_email(email_lookup)
+            if email_owner is not None and email_owner.user_id != existing.user_id:
+                raise ConflictError("User with this email already exists.")
+            existing.login = login_lookup
+            existing.email = email_lookup
+            existing.password_hash = self._password_service.hash(command.password)
+            existing.role = self._PLATFORM_ADMIN_ROLE
+            existing.is_active = True
+            self._session.commit()
+            self._users.refresh(existing)
+            return self._mapper.to_domain(existing), "updated"
 
         user = UserModel(
             user_id=str(uuid4()),
@@ -233,7 +247,7 @@ class AuthService:
         self._users.add(user)
         self._session.commit()
         self._users.refresh(user)
-        return self._mapper.to_domain(user)
+        return self._mapper.to_domain(user), "created"
 
     def list_users(self, command: ListUsersCommand) -> tuple[list[User], int]:
         page = max(command.page, 1)
