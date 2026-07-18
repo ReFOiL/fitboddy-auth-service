@@ -45,7 +45,9 @@ class UserResponse(BaseModel):
     user_id: str
     tenant_id: str
     login: str
-    email: EmailStr
+    # Plain str: response must not 500 on already-stored bootstrap/dev emails
+    # (EmailStr rejects reserved TLDs like .local).
+    email: str
     role: str
     is_active: bool
     created_at: datetime
