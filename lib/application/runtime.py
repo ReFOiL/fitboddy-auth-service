@@ -38,6 +38,9 @@ class AuthApplicationRuntime:
                 marketplace_gateway=self._marketplace_gateway,
                 marketplace_profile_sync_enabled=self._settings.marketplace_profile_sync_enabled,
             )
+        except Exception:
+            session.rollback()
+            raise
         finally:
             session.close()
 

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import re
 from uuid import uuid4
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from application.commands import (
@@ -116,17 +117,21 @@ class AuthService:
             role=role,
             is_active=True,
         )
-        self._users.add(user)
-        self._session.flush()
-        if self._marketplace_profile_sync_enabled:
-            try:
-                self._marketplace_gateway.upsert_discovery_profile(user.user_id, role)
-            except IntegrationError:
-                self._session.rollback()
-                raise
+        try:
+            self._users.add(user)
+            self._session.flush()
+            if self._marketplace_profile_sync_enabled:
+                try:
+                    self._marketplace_gateway.upsert_discovery_profile(user.user_id, role)
+                except IntegrationError:
+                    self._session.rollback()
+                    raise
 
-        token_pair = self._issue_token_pair(user)
-        self._session.commit()
+            token_pair = self._issue_token_pair(user)
+            self._session.commit()
+        except IntegrityError as exc:
+            self._session.rollback()
+            self._raise_registration_conflict(exc)
         self._users.refresh(user)
         return AuthResult(user=self._mapper.to_domain(user), tokens=token_pair)
 
@@ -244,8 +249,12 @@ class AuthService:
             role=self._PLATFORM_ADMIN_ROLE,
             is_active=True,
         )
-        self._users.add(user)
-        self._session.commit()
+        try:
+            self._users.add(user)
+            self._session.commit()
+        except IntegrityError as exc:
+            self._session.rollback()
+            self._raise_registration_conflict(exc)
         self._users.refresh(user)
         return self._mapper.to_domain(user), "created"
 
@@ -335,3 +344,11 @@ class AuthService:
         if not self._LOGIN_PATTERN.fullmatch(normalized_login):
             raise ValidationError("Unsupported login format. Use 3-32 chars: a-z, 0-9, _, -, .")
         return normalized_login
+
+    def _raise_registration_conflict(self, exc: IntegrityError) -> None:
+        message = str(exc.orig).lower() if exc.orig is not None else str(exc).lower()
+        if "email" in message:
+            raise ConflictError("User with this email already exists.") from exc
+        if "login" in message:
+            raise ConflictError("User with this login already exists.") from exc
+        raise ConflictError("User already exists.") from exc

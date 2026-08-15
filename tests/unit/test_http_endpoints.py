@@ -139,17 +139,24 @@ def test_login_with_legacy_email_field_returns_422(client: TestClient) -> None:
 
 
 def test_register_duplicate_email_returns_409(client: TestClient) -> None:
-    payload = {
-        "login": "dup_login",
+    first_payload = {
+        "login": "dup_email_1",
         "email": "dup@example.com",
         "password": "MyStrongPass123",
         "role": "client",
     }
-    first_response = client.post("/api/v1/auth/register", json=payload)
+    second_payload = {
+        "login": "dup_email_2",
+        "email": "dup@example.com",
+        "password": "MyStrongPass123",
+        "role": "trainer",
+    }
+    first_response = client.post("/api/v1/auth/register", json=first_payload)
     assert first_response.status_code == 201
 
-    second_response = client.post("/api/v1/auth/register", json=payload)
+    second_response = client.post("/api/v1/auth/register", json=second_payload)
     assert second_response.status_code == 409
+    assert "email" in second_response.json()["detail"].lower()
 
 
 def test_register_duplicate_login_returns_409(client: TestClient) -> None:
@@ -170,6 +177,54 @@ def test_register_duplicate_login_returns_409(client: TestClient) -> None:
 
     second_response = client.post("/api/v1/auth/register", json=second_payload)
     assert second_response.status_code == 409
+    assert "login" in second_response.json()["detail"].lower()
+
+
+def test_register_parallel_same_email_only_one_succeeds() -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    from sqlalchemy import func, select
+
+    from application.commands import RegisterUserCommand
+    from application.config import Settings
+    from application.errors import ConflictError
+    from application.models import UserModel
+    from application.runtime import AuthApplicationRuntime
+
+    runtime = AuthApplicationRuntime(Settings())
+    email = "race-parallel@example.com"
+
+    def register(index: int) -> bool:
+        try:
+            with runtime.auth_service_scope() as auth_service:
+                auth_service.register_user(
+                    RegisterUserCommand(
+                        role="client",
+                        login=f"race_par_{index}",
+                        email=email,
+                        password="MyStrongPass123",
+                    )
+                )
+            return True
+        except ConflictError:
+            return False
+
+    try:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            outcomes = list(pool.map(register, range(8)))
+        assert outcomes.count(True) == 1
+        assert outcomes.count(False) == 7
+
+        session = runtime._database.create_session()
+        try:
+            total = session.execute(
+                select(func.count()).select_from(UserModel).where(UserModel.email == email)
+            ).scalar_one()
+            assert total == 1
+        finally:
+            session.close()
+    finally:
+        runtime.shutdown()
 
 
 def test_me_without_bearer_token_returns_401(client: TestClient) -> None:
