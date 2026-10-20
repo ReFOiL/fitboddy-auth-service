@@ -19,6 +19,7 @@ Auth service for Fitboddy Platform MVP.
 - `POST /api/v1/auth/refresh`
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/auth/me`
+- `GET /api/v1/auth/clients/by-login?login={login}` (bearer; `trainer` or `platform_admin`. Exact login after trim and lowercase, `^[a-z0-9_.-]{3,32}$`. `200`: `user_id`, `login`, `role=client` — no email. One `404` for missing, inactive, or non-client. `422` if the login is invalid. `403` for other roles.)
 - `POST /api/v1/auth/check`
 - `POST /api/v1/auth/internal/summaries` (internal: `user_ids` -> `login`)
 

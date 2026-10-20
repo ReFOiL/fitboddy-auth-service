@@ -15,6 +15,7 @@ from application.commands import (
     ListUsersCommand,
     LoginUserCommand,
     LogoutSessionCommand,
+    LookupClientByLoginCommand,
     PatchUserCommand,
     RefreshSessionCommand,
     RegisterUserCommand,
@@ -31,7 +32,7 @@ from application.gateways import MarketplaceGateway
 from application.models import RefreshTokenModel, UserModel
 from application.repositories import RefreshTokenRepository, UserRepository
 from application.security import JwtService, PasswordService, TokenError
-from domain.entities import User, UserSummary
+from domain.entities import ClientLookup, User, UserSummary
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,11 @@ class UserMapper:
 class AuthService:
     _DEFAULT_TENANT_ID = "marketplace"
     _PLATFORM_ADMIN_ROLE = "platform_admin"
+    _CLIENT_ROLE = "client"
+    # Поиск для приглашения: тренер и администратор платформы.
+    _CLIENT_LOOKUP_ROLES = frozenset({"trainer", _PLATFORM_ADMIN_ROLE})
+    # Один текст на отсутствие, неактивность и чужую роль — без перечисления учёток.
+    _CLIENT_NOT_FOUND_MESSAGE = "Client not found."
     _LOGIN_PATTERN = re.compile(r"^[a-z0-9_.-]{3,32}$")
     _ROLE_MAP = {
         "owner": "trainer",
@@ -215,6 +221,21 @@ class AuthService:
         if user.role != self._PLATFORM_ADMIN_ROLE:
             raise ForbiddenError("platform_admin role required")
         return user
+
+    def require_trainer_or_platform_admin(self, access_token: str) -> User:
+        user = self.get_current_user(GetCurrentUserCommand(access_token=access_token))
+        if user.role not in self._CLIENT_LOOKUP_ROLES:
+            raise ForbiddenError("trainer or platform_admin role required")
+        return user
+
+    def lookup_client_by_login(self, command: LookupClientByLoginCommand) -> ClientLookup:
+        # Точное совпадение после trim и lower. Нет записи, is_active=false или роль не client
+        # дают один NotFound, чтобы ответ не отличался при переборе логинов.
+        login_lookup = self._normalize_login(command.login)
+        user = self._users.find_by_login(login_lookup)
+        if user is None or not user.is_active or user.role != self._CLIENT_ROLE:
+            raise NotFoundError(self._CLIENT_NOT_FOUND_MESSAGE)
+        return ClientLookup(user_id=user.user_id, login=user.login, role=self._CLIENT_ROLE)
 
     def bootstrap_platform_admin(self, command: BootstrapPlatformAdminCommand) -> tuple[User, str]:
         """Create or repair platform_admin from env credentials.

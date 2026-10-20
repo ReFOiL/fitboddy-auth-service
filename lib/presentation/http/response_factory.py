@@ -1,6 +1,13 @@
-from domain.entities import User, UserSummary
+from domain.entities import ClientLookup, User, UserSummary
 from application.use_cases import AuthResult
-from presentation.http.schemas import AuthResponse, InternalUserSummariesResponse, TokenPairResponse, UserResponse, UserSummaryResponse
+from presentation.http.schemas import (
+    AuthResponse,
+    ClientLookupResponse,
+    InternalUserSummariesResponse,
+    TokenPairResponse,
+    UserResponse,
+    UserSummaryResponse,
+)
 
 
 class AuthResponseFactory:
@@ -31,3 +38,8 @@ class AuthResponseFactory:
     @staticmethod
     def from_user_summary(summary: UserSummary) -> UserSummaryResponse:
         return UserSummaryResponse(user_id=summary.user_id, login=summary.login)
+
+    @staticmethod
+    def from_client_lookup(client: ClientLookup) -> ClientLookupResponse:
+        # Роль в контракте всегда client: email и остальные поля User сюда не попадают.
+        return ClientLookupResponse(user_id=client.user_id, login=client.login, role="client")

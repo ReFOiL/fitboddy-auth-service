@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -61,6 +62,13 @@ class AuthResponse(BaseModel):
 class UserSummaryResponse(BaseModel):
     user_id: str
     login: str
+
+
+class ClientLookupResponse(BaseModel):
+    # Только поля для приглашения. Email и профиль сюда не входят.
+    user_id: str
+    login: str
+    role: Literal["client"]
 
 
 class InternalUserSummariesResponse(BaseModel):

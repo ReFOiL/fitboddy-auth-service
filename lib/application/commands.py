@@ -57,6 +57,11 @@ class GetUserCommand:
 
 
 @dataclass(frozen=True)
+class LookupClientByLoginCommand:
+    login: str
+
+
+@dataclass(frozen=True)
 class PatchUserCommand:
     user_id: str
     is_active: bool | None

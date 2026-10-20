@@ -3,6 +3,7 @@ from application.commands import (
     ListUserSummariesCommand,
     LoginUserCommand,
     LogoutSessionCommand,
+    LookupClientByLoginCommand,
     RefreshSessionCommand,
     RegisterUserCommand,
 )
@@ -38,3 +39,6 @@ class AuthRequestFactory:
 
     def to_internal_summaries_command(self, payload: InternalUserSummariesRequest) -> ListUserSummariesCommand:
         return ListUserSummariesCommand(user_ids=payload.user_ids)
+
+    def to_lookup_client_command(self, login: str) -> LookupClientByLoginCommand:
+        return LookupClientByLoginCommand(login=login)
