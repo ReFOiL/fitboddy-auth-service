@@ -10,6 +10,7 @@ from presentation.http.schemas import (
     AuthResponse,
     CheckRequest,
     HealthResponse,
+    ClientLookupResponse,
     InternalUserSummariesRequest,
     InternalUserSummariesResponse,
     LoginRequest,
@@ -109,6 +110,17 @@ class AuthHttpHandler:
             with self._runtime.auth_service_scope() as auth_service:
                 summaries = auth_service.list_user_summaries(self._request_factory.to_internal_summaries_command(payload))
                 return self._response_factory.from_user_summaries(summaries)
+        except AuthError as exc:
+            self._error_translator.raise_http_error(exc)
+        raise AssertionError("unreachable")
+
+    def lookup_client_by_login(self, *, authorization: str, login: str) -> ClientLookupResponse:
+        access_token = self._extract_bearer(authorization)
+        try:
+            with self._runtime.auth_service_scope() as auth_service:
+                auth_service.require_trainer_or_platform_admin(access_token)
+                client = auth_service.lookup_client_by_login(self._request_factory.to_lookup_client_command(login))
+                return self._response_factory.from_client_lookup(client)
         except AuthError as exc:
             self._error_translator.raise_http_error(exc)
         raise AssertionError("unreachable")

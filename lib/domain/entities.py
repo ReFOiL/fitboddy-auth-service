@@ -17,3 +17,12 @@ class User:
 class UserSummary:
     user_id: str
     login: str
+
+
+@dataclass(frozen=True)
+class ClientLookup:
+    """Карточка клиента для приглашения: без email и служебных полей."""
+
+    user_id: str
+    login: str
+    role: str
