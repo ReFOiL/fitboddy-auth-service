@@ -15,7 +15,7 @@ if TEST_DB_PATH.exists():
     TEST_DB_PATH.unlink()
 
 os.environ["DATABASE_URL"] = f"sqlite+pysqlite:///{TEST_DB_PATH.as_posix()}"
-os.environ["JWT_SECRET"] = "test_secret"
+os.environ["JWT_SECRET"] = "unit-test-jwt-secret-32-bytes-min"
 os.environ["ACCESS_TOKEN_TTL_MINUTES"] = "15"
 os.environ["REFRESH_TOKEN_TTL_MINUTES"] = "120"
 os.environ["MARKETPLACE_PROFILE_SYNC_ENABLED"] = "false"

@@ -26,10 +26,10 @@ Auth service for Fitboddy Platform MVP.
 ## Environment
 
 - `DATABASE_URL` (required in k8s via secret)
-- `JWT_SECRET` (required in k8s for secure setup)
-- `JWT_ALGORITHM` (default: `HS256`)
-- `ACCESS_TOKEN_TTL_MINUTES` (default: `15`)
-- `REFRESH_TOKEN_TTL_MINUTES` (default: `10080`)
+- `JWT_SECRET` (required, at least 32 bytes; `auth_service_dev_secret_change_me` is rejected)
+- `JWT_ALGORITHM` (pinned to `HS256`)
+- `ACCESS_TOKEN_TTL_MINUTES` (default: `15`, allowed: 1–60)
+- `REFRESH_TOKEN_TTL_MINUTES` (default: `10080`, allowed: 5–43200)
 - `TENANT_SERVICE_URL` (default: `http://tenant-service`)
 - `HTTP_TIMEOUT_SECONDS` (default: `5`)
 - `MARKETPLACE_PROFILE_SYNC_ENABLED` (default: `true`)
